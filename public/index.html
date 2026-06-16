@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gas Price Finder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <div class="logo">
+        <span class="logo-icon">⛽</span>
+        <h1>Gas Price Finder</h1>
+      </div>
+      <p class="tagline">Find the cheapest gas near you</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- Controls -->
+    <section class="controls">
+      <div class="control-row">
+        <div class="grade-filter">
+          <label>Fuel Grade</label>
+          <div class="grade-buttons">
+            <button class="grade-btn active" data-grade="regular">Regular</button>
+            <button class="grade-btn" data-grade="midgrade">Mid-Grade</button>
+            <button class="grade-btn" data-grade="premium">Premium</button>
+            <button class="grade-btn" data-grade="diesel">Diesel</button>
+          </div>
+        </div>
+        <div class="radius-filter">
+          <label for="radius">Search Radius</label>
+          <select id="radius">
+            <option value="2">2 miles</option>
+            <option value="5" selected>5 miles</option>
+            <option value="10">10 miles</option>
+            <option value="25">25 miles</option>
+          </select>
+        </div>
+        <button id="locate-btn" class="locate-btn">
+          <span class="btn-icon">📍</span> Use My Location
+        </button>
+      </div>
+    </section>
+
+    <!-- Status bar -->
+    <div id="status-bar" class="status-bar hidden"></div>
+
+    <!-- Summary cards -->
+    <section id="summary" class="summary hidden">
+      <div class="summary-card cheapest">
+        <div class="summary-label">Cheapest</div>
+        <div id="cheapest-price" class="summary-price">--</div>
+        <div id="cheapest-name" class="summary-station">--</div>
+      </div>
+      <div class="summary-card average">
+        <div class="summary-label">Area Average</div>
+        <div id="avg-price" class="summary-price">--</div>
+        <div class="summary-station">per gallon</div>
+      </div>
+      <div class="summary-card most-expensive">
+        <div class="summary-label">Most Expensive</div>
+        <div id="expensive-price" class="summary-price">--</div>
+        <div id="expensive-name" class="summary-station">--</div>
+      </div>
+    </section>
+
+    <!-- Comparison table -->
+    <section id="results-section" class="results-section hidden">
+      <div class="results-header">
+        <h2 id="results-title">Stations Near You</h2>
+        <div class="sort-controls">
+          <label>Sort by</label>
+          <select id="sort-select">
+            <option value="price">Price (lowest first)</option>
+            <option value="distance">Distance (closest first)</option>
+            <option value="name">Station Name</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grade-comparison-toggle">
+        <button id="compare-btn" class="compare-btn">Compare All Grades</button>
+      </div>
+
+      <!-- Single grade list -->
+      <div id="station-list" class="station-list"></div>
+
+      <!-- Grade comparison table -->
+      <div id="comparison-table" class="comparison-table hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>Station</th>
+              <th>Regular</th>
+              <th>Mid-Grade</th>
+              <th>Premium</th>
+              <th>Diesel</th>
+              <th>Distance</th>
+            </tr>
+          </thead>
+          <tbody id="comparison-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Empty state -->
+    <section id="empty-state" class="empty-state">
+      <div class="empty-icon">⛽</div>
+      <h2>Find Gas Prices Near You</h2>
+      <p>Click "Use My Location" to see current gas prices and compare stations in your area.</p>
+    </section>
+
+    <!-- Loading state -->
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p>Finding gas prices near you...</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="error-state hidden">
+      <div class="error-icon">!</div>
+      <h2 id="error-title">Something went wrong</h2>
+      <p id="error-msg"></p>
+      <button onclick="retryFetch()" class="retry-btn">Try Again</button>
+    </div>
+  </main>
+
+  <footer>
+    <p>Prices sourced from GasBuddy. Updated in real time.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
