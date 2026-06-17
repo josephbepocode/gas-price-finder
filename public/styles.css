@@ -14,7 +14,6 @@
   --gray-600: #4b5563;
   --gray-800: #1f2937;
   --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
-  --shadow-md: 0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +27,6 @@ body {
   flex-direction: column;
 }
 
-/* Header */
 header {
   background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
   color: white;
@@ -50,7 +48,6 @@ header {
 .logo h1 { font-size: 1.75rem; font-weight: 700; }
 .tagline { color: #bfdbfe; font-size: 0.9rem; }
 
-/* Main */
 main {
   max-width: 900px;
   margin: 0 auto;
@@ -59,7 +56,6 @@ main {
   width: 100%;
 }
 
-/* Controls */
 .controls {
   background: white;
   border-radius: 12px;
@@ -75,7 +71,7 @@ main {
   align-items: flex-end;
 }
 
-.grade-filter, .radius-filter { display: flex; flex-direction: column; gap: 0.4rem; }
+.city-filter, .grade-filter { display: flex; flex-direction: column; gap: 0.4rem; }
 
 label {
   font-size: 0.75rem;
@@ -107,7 +103,7 @@ label {
   color: white;
 }
 
-#radius {
+#city-select {
   padding: 0.45rem 0.75rem;
   border: 2px solid var(--gray-200);
   border-radius: 8px;
@@ -117,7 +113,7 @@ label {
   cursor: pointer;
 }
 
-.locate-btn {
+.load-btn {
   margin-left: auto;
   padding: 0.6rem 1.25rem;
   background: var(--blue);
@@ -134,10 +130,9 @@ label {
   white-space: nowrap;
 }
 
-.locate-btn:hover { background: #1d4ed8; }
-.locate-btn:disabled { background: var(--gray-400); cursor: not-allowed; }
+.load-btn:hover { background: #1d4ed8; }
+.load-btn:disabled { background: var(--gray-400); cursor: not-allowed; }
 
-/* Status bar */
 .status-bar {
   background: var(--blue-light);
   color: var(--blue);
@@ -148,7 +143,6 @@ label {
   text-align: center;
 }
 
-/* Summary cards */
 .summary {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -178,11 +172,7 @@ label {
   margin-bottom: 0.5rem;
 }
 
-.summary-price {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-}
+.summary-price { font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem; }
 
 .cheapest .summary-price { color: var(--green); }
 .average .summary-price { color: var(--yellow); }
@@ -190,7 +180,6 @@ label {
 
 .summary-station { font-size: 0.8rem; color: var(--gray-600); }
 
-/* Results */
 .results-section { background: white; border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
 
 .results-header {
@@ -206,7 +195,6 @@ label {
 .results-header h2 { font-size: 1.1rem; font-weight: 700; }
 
 .sort-controls { display: flex; align-items: center; gap: 0.5rem; }
-
 .sort-controls label { margin: 0; }
 
 #sort-select {
@@ -235,7 +223,6 @@ label {
 .compare-btn:hover { background: var(--gray-200); }
 .compare-btn.active { background: var(--blue-light); border-color: var(--blue); color: var(--blue); }
 
-/* Station cards */
 .station-list { padding: 0.75rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
 
 .station-card {
@@ -280,36 +267,16 @@ label {
 
 .station-address { font-size: 0.8rem; color: var(--gray-400); margin-top: 0.1rem; }
 
-.station-distance {
-  font-size: 0.8rem;
-  color: var(--gray-400);
-  white-space: nowrap;
-}
-
-.station-price {
-  font-size: 1.5rem;
-  font-weight: 700;
-  text-align: right;
-  white-space: nowrap;
-}
+.station-price { font-size: 1.5rem; font-weight: 700; text-align: right; white-space: nowrap; }
 
 .price-green { color: var(--green); }
 .price-yellow { color: var(--yellow); }
 .price-red { color: var(--red); }
 
-.price-updated {
-  font-size: 0.7rem;
-  color: var(--gray-400);
-  text-align: right;
-}
-
+.price-updated { font-size: 0.7rem; color: var(--gray-400); text-align: right; }
 .price-unavailable { font-size: 0.85rem; color: var(--gray-400); font-style: italic; }
 
-/* Comparison table */
-.comparison-table {
-  overflow-x: auto;
-  padding: 0.75rem 1.25rem 1.25rem;
-}
+.comparison-table { overflow-x: auto; padding: 0.75rem 1.25rem 1.25rem; }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
 
@@ -334,32 +301,47 @@ td.price-cell { font-weight: 600; }
 td.cheapest-cell { color: var(--green); background: var(--green-light); font-weight: 700; }
 td.no-price { color: var(--gray-400); font-style: italic; }
 
-/* Empty / loading / error */
-.empty-state, .error-state {
-  text-align: center;
-  padding: 4rem 1rem;
+/* Trend section */
+.trend-section {
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  margin-top: 1.25rem;
 }
 
-.empty-icon, .error-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
+.trend-section h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+
+.trend-chart { overflow-x: auto; }
+
+.trend-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.trend-table th { text-align: left; padding: 0.5rem; background: var(--gray-50); border-bottom: 1px solid var(--gray-200); font-size: 0.75rem; text-transform: uppercase; }
+.trend-table td { padding: 0.5rem; border-bottom: 1px solid var(--gray-100); }
+
+.trend-bar-cell { width: 50%; }
+.trend-bar {
+  height: 1.25rem;
+  border-radius: 4px;
+  background: var(--blue);
+  transition: width 0.3s;
+  min-width: 2px;
 }
+
+/* Empty / loading / error */
+.empty-state, .error-state { text-align: center; padding: 4rem 1rem; }
+
+.empty-icon, .error-icon { font-size: 3rem; margin-bottom: 1rem; }
 
 .error-icon {
-  width: 4rem;
-  height: 4rem;
-  background: var(--red-light);
-  color: var(--red);
+  width: 4rem; height: 4rem;
+  background: var(--red-light); color: var(--red);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.75rem;
-  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.75rem; font-weight: 700;
   margin: 0 auto 1rem;
 }
 
-.empty-state h2, .error-state h2 { margin-bottom: 0.5rem; color: var(--gray-800); }
+.empty-state h2, .error-state h2 { margin-bottom: 0.5rem; }
 .empty-state p, .error-state p { color: var(--gray-600); max-width: 400px; margin: 0 auto; }
 
 .retry-btn {
@@ -376,15 +358,10 @@ td.no-price { color: var(--gray-400); font-style: italic; }
 
 .retry-btn:hover { background: #1d4ed8; }
 
-.loading {
-  text-align: center;
-  padding: 4rem 1rem;
-  color: var(--gray-600);
-}
+.loading { text-align: center; padding: 4rem 1rem; color: var(--gray-600); }
 
 .spinner {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.5rem; height: 2.5rem;
   border: 3px solid var(--gray-200);
   border-top-color: var(--blue);
   border-radius: 50%;
@@ -394,7 +371,6 @@ td.no-price { color: var(--gray-400); font-style: italic; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Footer */
 footer {
   text-align: center;
   padding: 1.25rem;
@@ -404,14 +380,15 @@ footer {
   background: white;
 }
 
-/* Utility */
+footer a { color: var(--blue); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
 .hidden { display: none !important; }
 
-/* Responsive */
 @media (max-width: 640px) {
   .summary { grid-template-columns: 1fr; }
   .control-row { flex-direction: column; align-items: stretch; }
-  .locate-btn { margin-left: 0; justify-content: center; }
+  .load-btn { margin-left: 0; justify-content: center; }
   .results-header { flex-direction: column; align-items: flex-start; }
   .logo h1 { font-size: 1.4rem; }
   .summary-price { font-size: 1.6rem; }

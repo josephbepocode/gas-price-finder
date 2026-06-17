@@ -1,44 +1,39 @@
 // State
-let allStations = [];
-let currentGrade = 'regular';
-let currentLat = null;
-let currentLng = null;
+let allData = {};       // { fuelType: { city: price, ... }, ... }
+let trendData = [];     // last N weeks for trend view
+let currentGrade = 'Regular Unleaded Gasoline';
+let currentCity = 'all';
 let compareMode = false;
+let latestDate = '';
 
-const GRADE_MAP = {
-  regular:  { label: 'Regular',   nickname: ['regular', 'unleaded', 'regular unleaded'] },
-  midgrade: { label: 'Mid-Grade', nickname: ['midgrade', 'plus', 'mid-grade', 'mid grade'] },
-  premium:  { label: 'Premium',   nickname: ['premium', 'super', 'super premium'] },
-  diesel:   { label: 'Diesel',    nickname: ['diesel'] },
+const CSV_URL = 'https://www.ontario.ca/v1/files/fuel-prices/fueltypesall.csv';
+const CORS_PROXY = 'https://corsproxy.io/?url=';
+const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+const CITIES = [
+  'Ottawa', 'Toronto West', 'Toronto East', 'Windsor', 'London',
+  'Peterborough', "St. Catharine's", 'Sudbury', 'Sault Saint Marie',
+  'Thunder Bay', 'North Bay', 'Timmins', 'Kenora', 'Parry Sound'
+];
+
+const FUEL_TYPES = [
+  'Regular Unleaded Gasoline',
+  'Mid-Grade Gasoline',
+  'Premium Gasoline',
+  'Diesel'
+];
+
+const FUEL_LABELS = {
+  'Regular Unleaded Gasoline': 'Regular',
+  'Mid-Grade Gasoline': 'Mid-Grade',
+  'Premium Gasoline': 'Premium',
+  'Diesel': 'Diesel'
 };
 
-// Use local proxy in dev, CORS proxy on GitHub Pages
-const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-const GASBUDDY_URL = 'https://www.gasbuddy.com/graphql';
-const CORS_PROXY = 'https://corsproxy.io/?url=';
-
-const GRAPHQL_QUERY = `
-  query StationSearch($cursor: String, $limit: Int, $search: GasStationSearchInput!) {
-    stations(cursor: $cursor, limit: $limit, search: $search) {
-      count
-      results {
-        id
-        name
-        address { line1 city state zip lat lng }
-        prices {
-          cash   { nickname postedTime price formattedPrice }
-          credit { nickname postedTime price formattedPrice }
-        }
-        distance
-      }
-    }
-  }
-`;
-
 // DOM refs
-const locateBtn      = document.getElementById('locate-btn');
+const loadBtn        = document.getElementById('load-btn');
 const statusBar      = document.getElementById('status-bar');
-const summary        = document.getElementById('summary');
+const summaryEl      = document.getElementById('summary');
 const resultsSection = document.getElementById('results-section');
 const emptyState     = document.getElementById('empty-state');
 const loadingEl      = document.getElementById('loading');
@@ -48,283 +43,332 @@ const compareTable   = document.getElementById('comparison-table');
 const comparisonBody = document.getElementById('comparison-body');
 const compareBtn     = document.getElementById('compare-btn');
 const sortSelect     = document.getElementById('sort-select');
-const radiusSelect   = document.getElementById('radius');
+const citySelect     = document.getElementById('city-select');
+const trendSection   = document.getElementById('trend-section');
+const trendChart     = document.getElementById('trend-chart');
 
 document.querySelectorAll('.grade-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.grade-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentGrade = btn.dataset.grade;
-    if (allStations.length > 0) render();
+    if (Object.keys(allData).length > 0) render();
   });
 });
 
-locateBtn.addEventListener('click', locate);
+loadBtn.addEventListener('click', loadPrices);
 compareBtn.addEventListener('click', toggleCompare);
-sortSelect.addEventListener('change', () => { if (allStations.length > 0) render(); });
-radiusSelect.addEventListener('change', () => { if (currentLat) fetchStations(currentLat, currentLng); });
+sortSelect.addEventListener('change', () => { if (Object.keys(allData).length > 0) render(); });
+citySelect.addEventListener('change', () => {
+  currentCity = citySelect.value;
+  if (Object.keys(allData).length > 0) render();
+});
 
-function locate() {
-  if (!navigator.geolocation) {
-    showError('Geolocation Not Supported', 'Your browser does not support geolocation.');
-    return;
-  }
+async function loadPrices() {
   showLoading();
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      currentLat = pos.coords.latitude;
-      currentLng = pos.coords.longitude;
-      fetchStations(currentLat, currentLng);
-    },
-    err => {
-      const msgs = {
-        1: 'Location permission was denied. Please allow location access and try again.',
-        2: 'Your location could not be determined.',
-        3: 'Location request timed out.',
-      };
-      showError('Location Error', msgs[err.code] || 'Unknown location error.');
-    },
-    { timeout: 10000 }
-  );
-}
-
-async function fetchStations(lat, lng) {
-  showLoading();
-  const radius = radiusSelect.value;
-
   try {
-    let json;
-
-    if (isLocalDev) {
-      // Local Node proxy
-      const res = await fetch('/api/stations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat, lng, radius }),
-      });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      json = await res.json();
-    } else {
-      // Direct call via CORS proxy for GitHub Pages
-      const body = JSON.stringify({
-        operationName: 'StationSearch',
-        query: GRAPHQL_QUERY,
-        variables: {
-          limit: 30,
-          search: { lat: parseFloat(lat), lng: parseFloat(lng), radius: parseFloat(radius) },
-        },
-      });
-
-      const res = await fetch(CORS_PROXY + encodeURIComponent(GASBUDDY_URL), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-requested-with': 'XMLHttpRequest',
-        },
-        body,
-      });
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      json = await res.json();
-    }
-
-    const stations = json?.data?.stations?.results ?? [];
-    if (stations.length === 0) {
-      showError('No Stations Found', `No gas stations found within ${radius} miles. Try increasing the search radius.`);
-      return;
-    }
-
-    allStations = stations;
+    const url = isLocalDev ? '/api/prices' : CORS_PROXY + encodeURIComponent(CSV_URL);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch data (${res.status})`);
+    const csv = await res.text();
+    parseCSV(csv);
     render();
   } catch (err) {
     showError('Failed to Load Prices', err.message);
   }
 }
+window.loadPrices = loadPrices;
 
-function retryFetch() {
-  if (currentLat) fetchStations(currentLat, currentLng);
-  else locate();
+function parseCSV(csv) {
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) throw new Error('No data in CSV');
+
+  const rows = lines.slice(1).map(line => {
+    const parts = line.split(',');
+    return {
+      date: parts[0],
+      prices: CITIES.map((_, i) => parseFloat(parts[i + 1]) || 0),
+      fuelType: parts[17]
+    };
+  });
+
+  // Get the latest date
+  const dates = [...new Set(rows.map(r => r.date))].sort();
+  latestDate = dates[dates.length - 1];
+
+  // Build latest data: { fuelType: { city: price } }
+  allData = {};
+  FUEL_TYPES.forEach(ft => {
+    allData[ft] = {};
+    const row = rows.find(r => r.date === latestDate && r.fuelType === ft);
+    if (row) {
+      CITIES.forEach((city, i) => {
+        allData[ft][city] = row.prices[i] > 0 ? row.prices[i] : null;
+      });
+    }
+  });
+
+  // Build trend data: last 12 weeks for each fuel type
+  const recentDates = dates.slice(-12);
+  trendData = recentDates.map(date => {
+    const entry = { date };
+    FUEL_TYPES.forEach(ft => {
+      const row = rows.find(r => r.date === date && r.fuelType === ft);
+      entry[ft] = {};
+      if (row) {
+        CITIES.forEach((city, i) => {
+          entry[ft][city] = row.prices[i] > 0 ? row.prices[i] : null;
+        });
+      }
+    });
+    return entry;
+  });
 }
-window.retryFetch = retryFetch;
 
 function render() {
   hideAll();
-  statusBar.textContent = `Showing stations within ${radiusSelect.value} miles`;
+
+  const dateStr = formatDate(latestDate);
+  statusBar.textContent = `Prices as of ${dateStr}`;
   statusBar.classList.remove('hidden');
-  summary.classList.remove('hidden');
+  summaryEl.classList.remove('hidden');
   resultsSection.classList.remove('hidden');
 
-  const sorted = getSorted(allStations, currentGrade, sortSelect.value);
-  updateSummary(sorted, currentGrade);
+  const prices = allData[currentGrade] || {};
+
+  if (currentCity === 'all') {
+    renderAllCities(prices);
+  } else {
+    renderSingleCity();
+  }
+}
+
+function renderAllCities(prices) {
+  const cityPrices = CITIES
+    .map(city => ({ city, price: prices[city] }))
+    .filter(c => c.price !== null);
+
+  const sorted = sortCities(cityPrices);
+  updateSummary(sorted);
 
   if (compareMode) {
     stationList.classList.add('hidden');
     compareTable.classList.remove('hidden');
-    renderCompareTable(sorted);
+    renderCompareTable();
   } else {
     compareTable.classList.add('hidden');
     stationList.classList.remove('hidden');
-    renderStationList(sorted, currentGrade);
+    renderCityList(sorted);
   }
 
   document.getElementById('results-title').textContent =
-    `${GRADE_MAP[currentGrade].label} Gas — ${allStations.length} Stations`;
+    `${FUEL_LABELS[currentGrade]} — ${cityPrices.length} Cities`;
+
+  trendSection.classList.add('hidden');
 }
 
-function getSorted(stations, grade, sortBy) {
-  return [...stations].sort((a, b) => {
-    if (sortBy === 'price') {
-      const pa = getPrice(a, grade);
-      const pb = getPrice(b, grade);
-      if (pa === null && pb === null) return 0;
-      if (pa === null) return 1;
-      if (pb === null) return -1;
-      return pa - pb;
-    }
-    if (sortBy === 'distance') return (a.distance ?? 99) - (b.distance ?? 99);
-    if (sortBy === 'name') return (a.name ?? '').localeCompare(b.name ?? '');
-    return 0;
-  });
-}
+function renderSingleCity() {
+  const cityPrices = FUEL_TYPES
+    .map(ft => ({ grade: ft, label: FUEL_LABELS[ft], price: (allData[ft] || {})[currentCity] }))
+    .filter(g => g.price !== null);
 
-function getPrice(station, grade) {
-  const prices = station.prices;
-  if (!prices) return null;
-  const all = [...(prices.credit ?? []), ...(prices.cash ?? [])];
-  const nicknames = GRADE_MAP[grade].nickname;
-  const match = all.find(p =>
-    p.nickname && nicknames.some(n => p.nickname.toLowerCase().includes(n))
-  );
-  return match?.price ?? null;
-}
-
-function updateSummary(sorted, grade) {
-  const withPrices = sorted.filter(s => getPrice(s, grade) !== null);
-  if (withPrices.length === 0) {
+  if (cityPrices.length === 0) {
     document.getElementById('cheapest-price').textContent = 'N/A';
-    document.getElementById('cheapest-name').textContent = 'No prices reported';
+    document.getElementById('cheapest-name').textContent = 'No data';
     document.getElementById('avg-price').textContent = 'N/A';
     document.getElementById('expensive-price').textContent = 'N/A';
-    document.getElementById('expensive-name').textContent = 'No prices reported';
-    return;
+    document.getElementById('expensive-name').textContent = 'No data';
+  } else {
+    const sorted = [...cityPrices].sort((a, b) => a.price - b.price);
+    const avg = sorted.reduce((s, c) => s + c.price, 0) / sorted.length;
+    document.getElementById('cheapest-price').textContent = fmt(sorted[0].price);
+    document.getElementById('cheapest-name').textContent = sorted[0].label;
+    document.getElementById('avg-price').textContent = fmt(avg);
+    document.getElementById('expensive-price').textContent = fmt(sorted[sorted.length - 1].price);
+    document.getElementById('expensive-name').textContent = sorted[sorted.length - 1].label;
   }
 
-  const prices = withPrices.map(s => getPrice(s, grade));
-  const cheapest = withPrices[0];
-  const expensive = withPrices[withPrices.length - 1];
-  const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+  compareTable.classList.add('hidden');
+  stationList.classList.remove('hidden');
 
-  document.getElementById('cheapest-price').textContent = `$${getPrice(cheapest, grade).toFixed(2)}`;
-  document.getElementById('cheapest-name').textContent = cheapest.name ?? 'Unknown';
-  document.getElementById('avg-price').textContent = `$${avg.toFixed(2)}`;
-  document.getElementById('expensive-price').textContent = `$${getPrice(expensive, grade).toFixed(2)}`;
-  document.getElementById('expensive-name').textContent = expensive.name ?? 'Unknown';
-}
-
-function priceColor(price, min, max) {
-  if (price === null) return '';
-  if (price <= min) return 'price-green';
-  if (price >= max) return 'price-red';
-  return 'price-yellow';
-}
-
-function renderStationList(sorted, grade) {
-  const withPrices = sorted.filter(s => getPrice(s, grade) !== null);
-  const prices = withPrices.map(s => getPrice(s, grade));
-  const min = prices.length ? Math.min(...prices) : 0;
-  const max = prices.length ? Math.max(...prices) : 0;
-
-  stationList.innerHTML = sorted.map((station, i) => {
-    const price = getPrice(station, grade);
-    const color = priceColor(price, min, max);
+  stationList.innerHTML = cityPrices.map((g, i) => {
+    const min = Math.min(...cityPrices.map(c => c.price));
+    const max = Math.max(...cityPrices.map(c => c.price));
+    const color = priceColor(g.price, min, max);
     const rank = i + 1;
     const badgeClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
-    const addr = station.address;
-    const address = addr ? `${addr.line1 ?? ''}, ${addr.city ?? ''}, ${addr.state ?? ''}`.replace(/^,\s*|,\s*$/, '') : '';
-    const dist = station.distance != null ? `${station.distance.toFixed(1)} mi away` : '';
-    const updated = getPostedTime(station, grade);
 
     return `
       <div class="station-card">
         <div class="rank-badge ${badgeClass}">${rank}</div>
         <div class="station-info">
-          <div class="station-name">${esc(station.name ?? 'Unknown Station')}</div>
-          <div class="station-address">${esc(address)}</div>
+          <div class="station-name">${esc(g.label)}</div>
+          <div class="station-address">${esc(currentCity)}</div>
         </div>
-        <div class="station-distance">${esc(dist)}</div>
-        <div>
-          ${price !== null
-            ? `<div class="station-price ${color}">$${price.toFixed(2)}</div>
-               <div class="price-updated">${updated ? `Updated ${updated}` : ''}</div>`
-            : `<div class="price-unavailable">No price reported</div>`
-          }
+        <div class="station-price ${color}">${fmt(g.price)}</div>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('results-title').textContent =
+    `${esc(currentCity)} — All Fuel Grades`;
+
+  renderTrend();
+}
+
+function sortCities(cityPrices) {
+  const sortBy = sortSelect.value;
+  return [...cityPrices].sort((a, b) => {
+    if (sortBy === 'price') return a.price - b.price;
+    return a.city.localeCompare(b.city);
+  });
+}
+
+function updateSummary(sorted) {
+  if (sorted.length === 0) {
+    document.getElementById('cheapest-price').textContent = 'N/A';
+    document.getElementById('cheapest-name').textContent = 'No data';
+    document.getElementById('avg-price').textContent = 'N/A';
+    document.getElementById('expensive-price').textContent = 'N/A';
+    document.getElementById('expensive-name').textContent = 'No data';
+    return;
+  }
+
+  const avg = sorted.reduce((s, c) => s + c.price, 0) / sorted.length;
+
+  document.getElementById('cheapest-price').textContent = fmt(sorted[0].price);
+  document.getElementById('cheapest-name').textContent = sorted[0].city;
+  document.getElementById('avg-price').textContent = fmt(avg);
+  document.getElementById('expensive-price').textContent = fmt(sorted[sorted.length - 1].price);
+  document.getElementById('expensive-name').textContent = sorted[sorted.length - 1].city;
+}
+
+function renderCityList(sorted) {
+  const prices = sorted.map(c => c.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+
+  stationList.innerHTML = sorted.map((item, i) => {
+    const color = priceColor(item.price, min, max);
+    const rank = i + 1;
+    const badgeClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+    const region = isNorthern(item.city) ? 'Northern Ontario' : 'Southern Ontario';
+
+    return `
+      <div class="station-card">
+        <div class="rank-badge ${badgeClass}">${rank}</div>
+        <div class="station-info">
+          <div class="station-name">${esc(item.city)}</div>
+          <div class="station-address">${esc(region)}</div>
         </div>
+        <div class="station-price ${color}">${fmt(item.price)}</div>
       </div>
     `;
   }).join('');
 }
 
-function renderCompareTable(sorted) {
-  const grades = ['regular', 'midgrade', 'premium', 'diesel'];
+function renderCompareTable() {
   const mins = {};
-  grades.forEach(g => {
-    const prices = sorted.map(s => getPrice(s, g)).filter(p => p !== null);
-    mins[g] = prices.length ? Math.min(...prices) : null;
+  FUEL_TYPES.forEach(ft => {
+    const prices = CITIES.map(c => (allData[ft] || {})[c]).filter(p => p !== null && p > 0);
+    mins[ft] = prices.length ? Math.min(...prices) : null;
   });
 
-  comparisonBody.innerHTML = sorted.map(station => {
-    const addr = station.address;
-    const city = addr ? `${addr.city ?? ''}, ${addr.state ?? ''}` : '';
-    const dist = station.distance != null ? `${station.distance.toFixed(1)} mi` : '--';
-
-    const cells = grades.map(g => {
-      const price = getPrice(station, g);
-      if (price === null) return `<td class="no-price">--</td>`;
-      const isCheapest = mins[g] !== null && price === mins[g];
-      return `<td class="price-cell ${isCheapest ? 'cheapest-cell' : ''}">$${price.toFixed(2)}</td>`;
+  comparisonBody.innerHTML = CITIES.map(city => {
+    const cells = FUEL_TYPES.map(ft => {
+      const price = (allData[ft] || {})[city];
+      if (!price) return '<td class="no-price">--</td>';
+      const isCheapest = mins[ft] !== null && price === mins[ft];
+      return `<td class="price-cell ${isCheapest ? 'cheapest-cell' : ''}">${fmt(price)}</td>`;
     }).join('');
 
     return `
       <tr>
-        <td>
-          <div style="font-weight:600">${esc(station.name ?? 'Unknown')}</div>
-          <div style="font-size:.75rem;color:var(--gray-400)">${esc(city)}</div>
-        </td>
+        <td><div style="font-weight:600">${esc(city)}</div></td>
         ${cells}
-        <td>${esc(dist)}</td>
       </tr>
     `;
   }).join('');
 }
 
-function getPostedTime(station, grade) {
-  const prices = station.prices;
-  if (!prices) return null;
-  const all = [...(prices.credit ?? []), ...(prices.cash ?? [])];
-  const nicknames = GRADE_MAP[grade].nickname;
-  const match = all.find(p =>
-    p.nickname && nicknames.some(n => p.nickname.toLowerCase().includes(n))
-  );
-  if (!match?.postedTime) return null;
-  try {
-    const d = new Date(match.postedTime);
-    const diff = Math.floor((Date.now() - d) / 60000);
-    if (diff < 60) return `${diff}m ago`;
-    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-    return `${Math.floor(diff / 1440)}d ago`;
-  } catch { return null; }
+function renderTrend() {
+  if (trendData.length === 0) {
+    trendSection.classList.add('hidden');
+    return;
+  }
+
+  trendSection.classList.remove('hidden');
+  document.getElementById('trend-title').textContent =
+    `${esc(currentCity)} — ${FUEL_LABELS[currentGrade]} Price Trend`;
+
+  const trendPrices = trendData.map(w => ({
+    date: w.date,
+    price: (w[currentGrade] || {})[currentCity] || null
+  }));
+
+  const validPrices = trendPrices.filter(t => t.price !== null).map(t => t.price);
+  const maxPrice = validPrices.length ? Math.max(...validPrices) : 1;
+  const minPrice = validPrices.length ? Math.min(...validPrices) : 0;
+  const range = maxPrice - minPrice || 1;
+
+  trendChart.innerHTML = `
+    <table class="trend-table">
+      <thead>
+        <tr><th>Week</th><th>Price</th><th></th></tr>
+      </thead>
+      <tbody>
+        ${trendPrices.map(t => {
+          if (t.price === null) {
+            return `<tr><td>${formatDate(t.date)}</td><td class="no-price">--</td><td></td></tr>`;
+          }
+          const pct = ((t.price - minPrice) / range) * 80 + 20;
+          return `
+            <tr>
+              <td>${formatDate(t.date)}</td>
+              <td style="font-weight:600">${fmt(t.price)}</td>
+              <td class="trend-bar-cell"><div class="trend-bar" style="width:${pct}%"></div></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 function toggleCompare() {
   compareMode = !compareMode;
   compareBtn.classList.toggle('active', compareMode);
   compareBtn.textContent = compareMode ? 'Show Single Grade' : 'Compare All Grades';
-  if (allStations.length > 0) render();
+  if (Object.keys(allData).length > 0) render();
+}
+
+function fmt(cents) {
+  return cents.toFixed(1) + '¢';
+}
+
+function priceColor(price, min, max) {
+  if (price <= min) return 'price-green';
+  if (price >= max) return 'price-red';
+  return 'price-yellow';
+}
+
+function isNorthern(city) {
+  return ['Sudbury', 'Sault Saint Marie', 'Thunder Bay', 'North Bay', 'Timmins', 'Kenora', 'Parry Sound'].includes(city);
+}
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
 }
 
 function showLoading() {
   hideAll();
   loadingEl.classList.remove('hidden');
-  locateBtn.disabled = true;
+  loadBtn.disabled = true;
 }
 
 function showError(title, msg) {
@@ -332,17 +376,18 @@ function showError(title, msg) {
   document.getElementById('error-title').textContent = title;
   document.getElementById('error-msg').textContent = msg;
   errorState.classList.remove('hidden');
-  locateBtn.disabled = false;
+  loadBtn.disabled = false;
 }
 
 function hideAll() {
   emptyState.classList.add('hidden');
   loadingEl.classList.add('hidden');
   errorState.classList.add('hidden');
-  summary.classList.add('hidden');
+  summaryEl.classList.add('hidden');
   resultsSection.classList.add('hidden');
   statusBar.classList.add('hidden');
-  locateBtn.disabled = false;
+  trendSection.classList.add('hidden');
+  loadBtn.disabled = false;
 }
 
 function esc(str) {

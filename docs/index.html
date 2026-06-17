@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gas Price Finder</title>
+  <title>Ontario Gas Price Finder</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -11,44 +11,52 @@
     <div class="header-content">
       <div class="logo">
         <span class="logo-icon">⛽</span>
-        <h1>Gas Price Finder</h1>
+        <h1>Ontario Gas Prices</h1>
       </div>
-      <p class="tagline">Find the cheapest gas near you</p>
+      <p class="tagline">Compare fuel prices across Ontario cities &mdash; updated weekly</p>
     </div>
   </header>
 
   <main>
-    <!-- Controls -->
     <section class="controls">
       <div class="control-row">
+        <div class="city-filter">
+          <label for="city-select">Your City</label>
+          <select id="city-select">
+            <option value="all">All Cities</option>
+            <option value="Ottawa">Ottawa</option>
+            <option value="Toronto West">Toronto West</option>
+            <option value="Toronto East">Toronto East</option>
+            <option value="Windsor">Windsor</option>
+            <option value="London">London</option>
+            <option value="Peterborough">Peterborough</option>
+            <option value="St. Catharine's">St. Catharines</option>
+            <option value="Sudbury">Sudbury</option>
+            <option value="Sault Saint Marie">Sault Ste. Marie</option>
+            <option value="Thunder Bay">Thunder Bay</option>
+            <option value="North Bay">North Bay</option>
+            <option value="Timmins">Timmins</option>
+            <option value="Kenora">Kenora</option>
+            <option value="Parry Sound">Parry Sound</option>
+          </select>
+        </div>
         <div class="grade-filter">
           <label>Fuel Grade</label>
           <div class="grade-buttons">
-            <button class="grade-btn active" data-grade="regular">Regular</button>
-            <button class="grade-btn" data-grade="midgrade">Mid-Grade</button>
-            <button class="grade-btn" data-grade="premium">Premium</button>
-            <button class="grade-btn" data-grade="diesel">Diesel</button>
+            <button class="grade-btn active" data-grade="Regular Unleaded Gasoline">Regular</button>
+            <button class="grade-btn" data-grade="Mid-Grade Gasoline">Mid-Grade</button>
+            <button class="grade-btn" data-grade="Premium Gasoline">Premium</button>
+            <button class="grade-btn" data-grade="Diesel">Diesel</button>
           </div>
         </div>
-        <div class="radius-filter">
-          <label for="radius">Search Radius</label>
-          <select id="radius">
-            <option value="2">2 miles</option>
-            <option value="5" selected>5 miles</option>
-            <option value="10">10 miles</option>
-            <option value="25">25 miles</option>
-          </select>
-        </div>
-        <button id="locate-btn" class="locate-btn">
-          <span class="btn-icon">📍</span> Use My Location
+        <button id="load-btn" class="load-btn">
+          <span class="btn-icon">🔄</span> Load Prices
         </button>
       </div>
     </section>
 
-    <!-- Status bar -->
     <div id="status-bar" class="status-bar hidden"></div>
 
-    <!-- Summary cards -->
     <section id="summary" class="summary hidden">
       <div class="summary-card cheapest">
         <div class="summary-label">Cheapest</div>
@@ -56,9 +64,9 @@
         <div id="cheapest-name" class="summary-station">--</div>
       </div>
       <div class="summary-card average">
-        <div class="summary-label">Area Average</div>
+        <div class="summary-label">Ontario Average</div>
         <div id="avg-price" class="summary-price">--</div>
-        <div class="summary-station">per gallon</div>
+        <div class="summary-station">per litre</div>
       </div>
       <div class="summary-card most-expensive">
         <div class="summary-label">Most Expensive</div>
@@ -67,38 +75,30 @@
       </div>
     </section>
 
-    <!-- Comparison table -->
     <section id="results-section" class="results-section hidden">
       <div class="results-header">
-        <h2 id="results-title">Stations Near You</h2>
+        <h2 id="results-title">City Prices</h2>
         <div class="sort-controls">
           <label>Sort by</label>
           <select id="sort-select">
             <option value="price">Price (lowest first)</option>
-            <option value="distance">Distance (closest first)</option>
-            <option value="name">Station Name</option>
+            <option value="name">City Name</option>
           </select>
         </div>
       </div>
-
       <div class="grade-comparison-toggle">
         <button id="compare-btn" class="compare-btn">Compare All Grades</button>
       </div>
-
-      <!-- Single grade list -->
       <div id="station-list" class="station-list"></div>
-
-      <!-- Grade comparison table -->
       <div id="comparison-table" class="comparison-table hidden">
         <table>
           <thead>
             <tr>
-              <th>Station</th>
+              <th>City</th>
               <th>Regular</th>
               <th>Mid-Grade</th>
               <th>Premium</th>
               <th>Diesel</th>
-              <th>Distance</th>
             </tr>
           </thead>
           <tbody id="comparison-body"></tbody>
@@ -106,30 +106,32 @@
       </div>
     </section>
 
-    <!-- Empty state -->
-    <section id="empty-state" class="empty-state">
-      <div class="empty-icon">⛽</div>
-      <h2>Find Gas Prices Near You</h2>
-      <p>Click "Use My Location" to see current gas prices and compare stations in your area.</p>
+    <section id="trend-section" class="trend-section hidden">
+      <h2 id="trend-title">Recent Price Trend</h2>
+      <div id="trend-chart" class="trend-chart"></div>
     </section>
 
-    <!-- Loading state -->
+    <section id="empty-state" class="empty-state">
+      <div class="empty-icon">⛽</div>
+      <h2>Ontario Gas Prices</h2>
+      <p>Click "Load Prices" to see current fuel prices across Ontario cities. Data from the Ontario Ministry of Energy.</p>
+    </section>
+
     <div id="loading" class="loading hidden">
       <div class="spinner"></div>
-      <p>Finding gas prices near you...</p>
+      <p>Fetching Ontario fuel prices...</p>
     </div>
 
-    <!-- Error state -->
     <div id="error-state" class="error-state hidden">
       <div class="error-icon">!</div>
       <h2 id="error-title">Something went wrong</h2>
       <p id="error-msg"></p>
-      <button onclick="retryFetch()" class="retry-btn">Try Again</button>
+      <button onclick="loadPrices()" class="retry-btn">Try Again</button>
     </div>
   </main>
 
   <footer>
-    <p>Prices sourced from GasBuddy. Updated in real time.</p>
+    <p>Data from the <a href="https://data.ontario.ca/dataset/fuels-price-survey-information" target="_blank" rel="noopener">Ontario Ministry of Energy</a> &mdash; updated weekly. Prices in &cent;/litre.</p>
   </footer>
 
   <script src="app.js"></script>
